@@ -1,0 +1,57 @@
+
+# monit rules
+#
+set daemon 30
+set logfile /var/log/monit.log
+
+# e-mail alerts
+set alert mar.bocatcat@gmail.com
+
+set httpd
+    port 2812
+    use address localhost # only accept connection from localhost
+    # allow localhost 	  # allow localhost to connect to the server
+    allow mar:monitPassword123
+
+######################### MONIT CHECKS ##################################
+
+# check system health
+check system "$HOST"
+	# test user part of cpu
+	if cpu usage (user) > 80% for 2 cycles then alert
+	# test system part of cput
+	if cpu usage (system) > 20% for 2 cycles then alert
+	if cpu usage > 200% for 4 cycles then alert
+	# test memory usage
+	if memory usage > 80% for 4 cycles then alert
+	if swap usage > 20% for 4 cycles then alert
+
+
+# check mysqldb
+check host mariadb with address 127.0.0.1
+	start program = "/usr/bin/systemctl start mariadb.service"
+	stop program = "/usr/bin/systemctl stop mariadb.service"
+	if failed ping then alert
+	if failed port 3306 protocol mysql then alert
+	if failed port 3306 protocol mysql for 3 cycles then restart
+
+# check nginx
+check process nginx with pidfile /var/run/nginx.pid
+	start program = "/usr/bin/systemctl start nginx.service"
+	stop program = "/usr/bin/systemctl stop nginx.service"
+	group nginx
+	if failed host 127.0.0.1 port 443 protocol https for 3 cycles then restart
+
+# check php-fpm
+check process php-fpm with pidfile /var/run/php-fpm/php-fpm.pid
+	if cpu > 50% for 2 cycles then alert
+	if memory > 800 MB then alert
+
+# make sure sshd service is working restart if not
+check process sshd with pidfile /var/run/sshd.pid
+	start program = "/usr/bin/systemctl start sshd.service"
+	stop program = "/usr/bin/systemctl stop sshd.service"
+	if failed port 22 protocol ssh then restart
+
+# include files for individual sites
+Include /etc/monit.d/*.cfg
